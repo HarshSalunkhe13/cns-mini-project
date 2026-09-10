@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureEnvelope | CNS Mini-Project</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-6">
+    <div class="w-full max-w-3xl bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl shadow-2xl p-8">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-500">SecureEnvelope</h1>
+            <p class="text-slate-400 text-sm mt-1">Hybrid Cryptographic Messaging Vault (Modules 3 & 4)</p>
+        </div>
+
+        <!-- Username Control -->
+        <div class="flex gap-4 mb-6">
+            <input type="text" id="username" placeholder="Enter User ID (e.g., alice)" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500">
+            <button onclick="generateKeys()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition shadow-lg shadow-indigo-600/30">Generate Keys</button>
+        </div>
+        <p id="keyStatus" class="text-xs text-emerald-400 mb-6 h-4"></p>
+
+        <!-- Action Workspace -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Encryption Panel -->
+            <div class="bg-slate-950/50 border border-slate-800/80 p-5 rounded-xl flex flex-col">
+                <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider mb-3">Encryption Workspace</h2>
+                <textarea id="plainMessage" placeholder="Type secret message..." class="w-full h-28 bg-slate-900 border border-slate-800 rounded-lg p-3 text-sm focus:outline-none focus:border-indigo-500 resize-none mb-3"></textarea>
+                <button onclick="encryptMessage()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 rounded-lg text-sm transition">Lock in Envelope</button>
+            </div>
+
+            <!-- Decryption Panel -->
+            <div class="bg-slate-950/50 border border-slate-800/80 p-5 rounded-xl flex flex-col">
+                <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider mb-3">Decryption Workspace</h2>
+                <textarea id="outputBox" readonly placeholder="Decrypted output appears here..." class="w-full h-28 bg-slate-900 border border-slate-800 rounded-lg p-3 text-sm focus:outline-none resize-none mb-3 text-emerald-400 font-mono"></textarea>
+                <button onclick="decryptMessage()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 rounded-lg text-sm transition">Unlock Envelope</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let payloadCache = {};
+
+        async function generateKeys() {
+            let user = document.getElementById('username').value;
+            if(!user) return alert("Please provide a username.");
+            let res = await fetch('/generate_keys', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: user})
+            });
+            let data = await res.json();
+            document.getElementById('keyStatus').innerText = data.message;
+        }
+
+        async function encryptMessage() {
+            let user = document.getElementById('username').value;
+            let message = document.getElementById('plainMessage').value;
+            if(!user || !message) return alert("Fill in username and message.");
+            
+            let res = await fetch('/encrypt', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: user, message: message})
+            });
+            let data = await res.json();
+            if(data.status === 'success') {
+                payloadCache = data;
+                alert("Message successfully sealed inside a Hybrid Digital Envelope!");
+            } else {
+                alert(data.message);
+            }
+        }
+
+        async function decryptMessage() {
+            let user = document.getElementById('username').value;
+            if(!user || !payloadCache.ciphertext) return alert("No active payload or user provided.");
+            
+            let res = await fetch('/decrypt', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    username: user,
+                    ciphertext: payloadCache.ciphertext,
+                    encrypted_key: payloadCache.encrypted_key,
+                    iv: payloadCache.iv
+                })
+            });
+            let data = await res.json();
+            if(data.status === 'success') {
+                document.getElementById('outputBox').value = data.message;
+            } else {
+                document.getElementById('outputBox').value = "Decryption Failed: " + data.message;
+            }
+        }
+    </script>
+</body>
+</html>
